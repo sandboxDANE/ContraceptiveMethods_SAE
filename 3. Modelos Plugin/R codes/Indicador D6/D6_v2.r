@@ -45,7 +45,7 @@ mount_point = "D:/SAE anticonceptivos/Colombia-UNFPA/"
 
 Xencuesta <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XencuestaD.rds"))  %>% filter(unida == 1)
 
-###------------ Anexando los Senate Weights a la base de la ENDS ------------###
+###------------ Senate Weights                                   ------------###
 
 Xencuesta$Sweights <- nrow(Xencuesta) * Xencuesta$fexp/sum(Xencuesta$fexp)
 Xencuesta = Xencuesta %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
