@@ -1,13 +1,11 @@
-################################################################################### 
-## Title:        Family Planning Indicator D6 - Use of Any Planning Method       ##
-## Returns:      Estimation Plugin by Domains of Interest                        ##  
-## The code was modified by Lina Sánchez, Sebastián Oviedo, DANE.                ## 
-## Carlos Rámirez,  Université de ## Montréal, Juliana Guerrero, World Bank.     ##
-## The original code was developed by Felipe Molina, Andrés Gutiérrez &          ##
-##  Diego Lemus in the MRP                                                       ##
-## Project - Left No One Behind, Institution: ECLAC                              ##  
-## Division: Statistics Division.                                                ##    
-###################################################################################
+######################################################################################################## 
+## Title:        Family Planning Indicator D6 - Use of Any Planning Method                            ##
+## Returns:      Estimation Plugin by Domains of Interest                                             ##  
+## The code was modified by Lina Sánchez, Sebastián Oviedo, DANE.                                     ## 
+## Carlos Rámirez,  Université de Montréal, Juliana Guerrero, World Bank.                             ##
+## The original code was developed by Felipe Molina, Andrés Gutiérrez and Diego Lemus in the MRP      ##                                                    ##
+## Project - Left No One Behind, Institution: ECLAC, Division: Statistics Division.                   ##                                               ##    
+########################################################################################################
 
 
 ###--- Cleaning R environment ---###
