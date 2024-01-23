@@ -1,21 +1,11 @@
-
-################################################################################
-##                     Proyecto MRP - Left No One Behind                      ##
-## Title:        Indicador de plaD6Mficación familiar D6 - Uso de algún método ##
-##               de plaD6Mficación                                             ##
-## Returns:      Estimación MSE por domiD6Mos de interés                       ##
-## Author:       Felipe Molina & Andrés Gutiérrez & Diego Lemus               ##
-## Institution:  CEPAL                                                        ##
-## Date:         2021                                                         ##
-## División:     División de Estadísticas                                     ##
-## Disclaimer:   Estos códigos computacionales han sido programados con el    ##
-##               fin de ejemplificar las metodologías propuestas por CEPAL.   ##
-##               La responsabilidad del uso de los programas recae            ##
-##               completamente sobre  los funcionarios a quienes se hace      ##
-##               entrega. Se exime a la CEPAL de los errores que puedan ser   ##
-##               ocasionados por el uso incorrecto de estos códigos.          ##
-## Modificado:   Sebastián Oviedo - Feb/2022                                  ##       
-################################################################################
+######################################################################################################## 
+## Title:        Family Planning Indicator D6m - Use of Modern Methods.                               ##
+## Returns:      Estimation MSE by Domains of Interest                                             ##  
+## The code was modified by Lina Sánchez, Sebastián Oviedo, DANE.                                     ## 
+## Carlos Rámirez,  Université de Montréal, Juliana Guerrero, World Bank.                             ##
+## The original code was developed by Felipe Molina, Andrés Gutiérrez and Diego Lemus in the MRP      ##                                               
+## Project - Left No One Behind, Institution: ECLAC, Division: Statistics Division.                   ##                                                 
+########################################################################################################
 
 options(encoding = "UTF-8", scipen = 999)
 rm(list = ls())
@@ -30,34 +20,34 @@ library(data.table)
 mount_point = "D:/SAE anticonceptivos/Colombia-UNFPA/"
 
 
-## Estimador original
+##  Original Estimator
 ###---------------------------------- ENDS ----------------------------------###
 
 
 Xencuesta <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XencuestaD.rds")) %>% filter(unida == 1)
 Xencuesta = Xencuesta %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
-###------------ Anexando los Senate Weights a la base de la ENDS ------------###
+###------------  Senate Weights ------------###
 
 Xencuesta$Sweights <- nrow(Xencuesta) * Xencuesta$fexp/sum(Xencuesta$fexp)
 
-###----- Identificador de Municipio - Departamento por persona del censo ----###
+###----- Municipality - Department Identifier per Census Person ----###
 
 Municipio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/Municipio.rds"))
 
-###--------------------------------- CENSO ----------------------------------###
+###--------------------------------- CENSUS ----------------------------------###
 
 Xcenso <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XcensoD.rds")) %>% filter(unida == 1)
 Xcenso = Xcenso %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 Xcenso = Xcenso %>% mutate(`reconoce_etnia:misma_etnia_1` = reconoce_etnia*misma_etnia_1)
 
 
-###----- Variables diseño ----###
+###----- Desing Variables ----###
 
 Variables.disenio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/variable_disenio_ENDS.rds"))
 Variables.disenio = Variables.disenio %>% mutate(log_Total_p = log(Total_p))
 
 
-###--------------------- Listado de los 1122 municipios ---------------------###
+###--------------------- List of the 1122 Municipalities ---------------------###
 Divipola <- Municipio %>% distinct(Divipola, .keep_all = T)
 
 Divipola$departamento = as.character(as.numeric(Divipola$departamento))
@@ -68,16 +58,16 @@ Xencuesta$departamento = as.character(as.numeric(Xencuesta$departamento))
 Xencuesta$municipio = as.character(as.numeric(Xencuesta$municipio))
 
 
-###------------ Anexando el código Divipola a la base de la ENDS ------------###
+###------------ Appending Divipola Code to the ENDS Database ------------###
 Xencuesta <- Xencuesta %>% left_join(., Variables.disenio,`copy` = TRUE,
                                      by = c("Divipola"= "Divipola"))
 
 
-# DomiD6Mos
+# Domains
 
 Div = unique(Xcenso$departamento_etnia)
 
-# tamaño de muestra Ends y poblacionales
+# Sample sizes for Ends and Population
 
 n_d = Xencuesta %>% group_by(departamento_etnia) %>% summarise(nd = n()) %>%
   mutate_all(~replace(.,is.na(.),0)) %>% as.data.frame()
@@ -116,10 +106,10 @@ betas = as.matrix(fixef(pluginreg))
 sd.u = pluginreg@theta
 
 ################################################################################
-#### Modelo con efectos aleatorios de departamento_etnia
+### Model with Random Effects of Department_Ethnicity
 ################################################################################
 
-###------------ Construcción de la matriz censal sintética XBeta ------------###
+###------------ Construction of the Synthetic Census Matrix XBeta ------------###
 
 matriz <- cbind.data.frame(Xcenso$departamento_etnia, cbind(1,as.matrix(Xcenso %>%
                                                                           dplyr::select(rownames(betas)[-1]))) %*% betas)
@@ -127,94 +117,98 @@ matriz <- cbind.data.frame(Xcenso$departamento_etnia, cbind(1,as.matrix(Xcenso %
 colnames(matriz) <- c("Divipola","XB")
 
 ################################################################################
-
-###------------ Limpiiar memoria ------###
+###------------ Clear Memory ------------###
 
 rm(Municipio)
 
-###----------- Lista donde se guardarán las iteraciones bootstrap -----------###
+###----------- List where Bootstrap Iterations will be Saved -----------###
 plugin.estrella = list()
 
-###--- Total de Municipios ---###
+###--- Total Municipalities ---###
 
 Div = unique(Xcenso$departamento_etnia)
 
-###--- Municipios en la encuesta ---###
+###--- Municipalities in the Survey ---###
 
 Div2 = unique(Xencuesta$departamento_etnia)
 B = 1000
 
-# Aquí va el for para el bootstrap
+
+## The for loop for the bootstrap goes here
 
 
 for(b in 1:B){
   print(paste0('Iteracion:',b))
   
-  #----------------------------------------------------------------------------#
-  #--- Paso 1: generar los efectos aleatorios para los Municipios en la ENDS --#
-  #----------------------------------------------------------------------------#
+  #-----------------------------------------------------------------------------#
+  #--- Step 1: Generate Random Effects for Municipalities in the ENDS ----------#
+  #-----------------------------------------------------------------------------#
   
   ud = data.frame(Divipola = Div2, ud = rnorm(length(Div2), 0, sd.u))
   
-  #-- Creando vector de efectos aleatorios para todos los Municipios del país -#
+  #-- Creating a vector of random effects for all Municipalities in the country -#
   ud = data.frame(Divipola = Div) %>% left_join(ud, by = "Divipola")
   
-  #----- Si el Municipio no fue encuestado tendrá un efecto aleatorio de 0 ----#
+  #----- If the Municipality was not surveyed, it will have a random effect of 0 ----#
   ud$ud[is.na(ud$ud)] <- 0
   
   
-  #----------------------------------------------------------------------------#
-  #-- Paso 2: Generar pseudocenso y estimador del parámetro a partir de este --#
-  #----------------------------------------------------------------------------#
-  
-  #---     Ubicación en la lista para almacenar el theta estimado en el     ---#
-  #---     pseudocenso y el obteD6Mdo en la muestra seleccionada de este     ---#
+#------------------------------------------------------------------------------#
+#-- Step 2: Generate Pseudocensus and Estimate the Parameter from it ----------#
+#------------------------------------------------------------------------------#
+
+#---     Location in the list to store the estimated theta in the       ---#
+#---     pseudocensus and obtained in the selected sample of this       ---#
   
   plugin.estrella[[b]] = cbind(theta.censo = numeric(nrow(ud)), 
                                theta.muestra = numeric(nrow(ud))) %>% 
     data.frame() %>% mutate(Codmun = ud$Divipola)
   
-  #- Censo con variable para generar la estimación de la probabilidad de D6M -#
+#- Census with a variable to generate the estimation of the D6M probability -#
   censoydi = cbind.data.frame(Xcenso$departamento_etnia, NA, Xcenso %>% as.data.table() %>% .[,c("Divipola") := NULL,])
   
   colnames(censoydi) <- c("Divipola", "Ydi", colnames(Xcenso %>% as.data.table() %>% .[,c("Divipola") := NULL,]))
   
   
-  # Para cada Divipola y cada individuo, se genera su estimacion de la probabilidad de uso
-  # Con dichas probabilidades se generan los pseudocensos
+
+  #For each Divipola and each individual, their probability of use estimation is generated.
+  #With these probabilities, pseudocensuses are generated.
   for(i in 1:length(Div)){
     print(paste0('Dominio:',i))
-    #--- Código del municipio ---#
+    #--- Municipality code ---#
     index = Div[i]
     
-    #--- Total poblacional del municipio ---#
+    #--- Total Population of the Municipality ---#
     N.d = N_d[N_d$departamento_etnia == index,]$Nd
     
-    #- Posición de matriz censal sintética XBeta que corresponde al municipio -#
+    #- Position in the Synthetic Census Matrix XBeta corresponding to the municipality -#
     pos = which(matriz$Divipola==index)
     
-    #- Probabilidad de que una mujer del municipio tenga NI de planificación -# 
+    
+    #- Probability that a woman in the municipality has Family Planning Unmet Need -#
     theta.di = (exp(matriz[pos,2] + rep(ud[i,2],N.d))/(1+exp(matriz[pos,2] + rep(ud[i,2],N.d))))
     
-    #- Posición en la base censal que corresponde al municipio -#
+    
+    #- Position in the Census Database corresponding to the municipality -#
     pos2 = which(censoydi$Divipola==index)
     
-    #- Generando la variable respuesta simulada a partir de la probabilidad -#
-    #-                de que una mujer del municipio tenga NI               -#
+    #- Generating the simulated response variable based on the probability -#
+    #-        that a woman in the municipality has Family Planning Unmet Need       -#
     censoydi[pos2,2] = rbinom(N.d,1,theta.di)
     
-    #-  Estimación de la probabilidad de NI en las mujeres   -# 
-    #-              del municipio en el pseudocenso          -#
+
+    #- Estimation of the probability of Family Planning Unmet Need in women -#
+    #- of the municipality in the pseudocensus -#
     plugin.estrella[[b]][i,1] = (1/N.d)*sum(censoydi[pos2,2])
   }
   
-  #----------------------------------------------------------------------------#
-  #-- Paso 3: Seleccionar muestra del pseudocenso y estimador del parámetro  --#
-  #--         a partir de la pseudomuestra                                   --#
-  #----------------------------------------------------------------------------#
+#------------------------------------------------------------------------------#
+#-- Step 3: Select a sample from the pseudocensus and estimate the parameter --#
+#--         from the pseudosample                                            --#
+#------------------------------------------------------------------------------#
   
-  #- Muestra del pseudocenso con tamaño que coincide con el número de mujeres -#
-  #-              seleccionada en la muestra municipios de la ENDS            -#
+  #- Sample from the pseudocensus with a size that matches the number of women -#
+  #-          selected in the sample of municipalities from the ENDS           -#
   
   muestra <- censoydi %>% left_join(n_d, by = c("Divipola" = "departamento_etnia")) %>%
     mutate(id_orig = 1:dim(censoydi)[1],Aleatorio = runif(dim(censoydi)[1])) %>% 
@@ -240,12 +234,11 @@ for(b in 1:B){
                              electricidad_si + tipo_viv_casa_departamento +
                              (1|departamento_etnia), family = "binomial", data = muestra) 
   
-  ###---    Exportando los efectos fijos comunes en el modelo bootstrap   ---###
+   ###--- Exporting the common fixed effects in the bootstrap model ---###
   
   betasB = as.matrix(fixef(pluginbootstrap))
   
-  
-  ###---- Exportando los efectos aleatorios para cada uno de los dominios ---###
+  ###---- Exporting the random effects for each of the domains ---###
   
   udB =  data.frame(Divipola = rownames(ranef(pluginbootstrap)$departamento_etnia), 
                     ud = ranef(pluginbootstrap)$departamento_etnia[[1]])
@@ -523,12 +516,4 @@ D6M_mse <- plugin.estrella2 %>% map_df(~.x %>% data.frame() %>%
 #------------------------------------------------------------------------------#
 
 saveRDS(D6M_mse %>% as.data.frame(), file = file.path(mount_point,"3. Modelos Plugin/Output/D6M/D6M_MSE_Divipola.rds"))
-
-
-
-
-
-
-
-
 
