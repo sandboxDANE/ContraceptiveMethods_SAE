@@ -1,21 +1,12 @@
+######################################################################################################## 
+## Title:        Family Planning Indicator NI - Unmeet needs.                                         ##
+## Returns:      Estimation MSE by Domains of Interest                                                ##  
+## The code was modified by Lina Sánchez, Sebastián Oviedo, DANE.                                     ## 
+## Carlos Rámirez,  Université de Montréal, Juliana Guerrero, World Bank.                             ##
+## The original code was developed by Felipe Molina, Andrés Gutiérrez and Diego Lemus in the MRP      ##                                               
+## Project - Left No One Behind, Institution: ECLAC, Division: Statistics Division.                   ##                                                 
+########################################################################################################
 
-################################################################################
-##                     Proyecto MRP - Left No One Behind                      ##
-## Title:        Indicador de planificación familiar D6 - Uso de algún método ##
-##               de planificación                                             ##
-## Returns:      Estimación MSE por dominios de interés                       ##
-## Author:       Felipe Molina & Andrés Gutiérrez & Diego Lemus               ##
-## Institution:  CEPAL                                                        ##
-## Date:         2021                                                         ##
-## División:     División de Estadísticas                                     ##
-## Disclaimer:   Estos códigos computacionales han sido programados con el    ##
-##               fin de ejemplificar las metodologías propuestas por CEPAL.   ##
-##               La responsabilidad del uso de los programas recae            ##
-##               completamente sobre  los funcionarios a quienes se hace      ##
-##               entrega. Se exime a la CEPAL de los errores que puedan ser   ##
-##               ocasionados por el uso incorrecto de estos códigos.          ##
-## Modificado:   Sebastian Oviedo                                             ##       
-################################################################################
 
 rm(list = ls())
 gc()
@@ -31,35 +22,34 @@ mount_point = "D:/SAE anticonceptivos/Colombia-UNFPA/"
 
 
 
-## Estimador original
+##  Original Estimator
 ###---------------------------------- ENDS ----------------------------------###
 
 Xencuesta <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XencuestaD.rds")) %>% filter(unida == 1)
 Xencuesta = Xencuesta %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 
-###------------ Anexando los Senate Weights a la base de la ENDS ------------###
+###------------  Senate Weights ------------###
 
 Xencuesta$Sweights <- nrow(Xencuesta) * Xencuesta$fexp/sum(Xencuesta$fexp)
 
-###----- Identificador de Municipio - Departamento por persona del censo ----###
+###----- Municipality - Department Identifier per Census Person ----###
 
 Municipio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/Municipio.rds"))
 
-###--------------------------------- CENSO ----------------------------------###
+###--------------------------------- CENSUS ----------------------------------###
 
 Xcenso <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XcensoD.rds")) %>% filter(unida == 1)
 Xcenso = Xcenso %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 Xcenso = Xcenso %>% mutate(`reconoce_etnia:misma_etnia_1` = reconoce_etnia*misma_etnia_1)
 
-###----- Variables diseño ----###
+###----- Desing Variables ----###
 
 Variables.disenio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/variable_disenio_ENDS.rds"))
 Variables.disenio = Variables.disenio %>% mutate(log_Total_p = log(Total_p))
 
-# COMMAND ----------
 
 
-###--------------------- Listado de los 1122 municipios ---------------------###
+###--------------------- List of the 1122 Municipalities ---------------------###
 Divipola <- Municipio %>% distinct(Divipola, .keep_all = T)
 
 Divipola$departamento = as.character(as.numeric(Divipola$departamento))
@@ -70,16 +60,16 @@ Xencuesta$departamento = as.character(as.numeric(Xencuesta$departamento))
 Xencuesta$municipio = as.character(as.numeric(Xencuesta$municipio))
 
 
-###------------ Anexando el código Divipola a la base de la ENDS ------------###
+###------------ Appending Divipola Code to the ENDS Database ------------###
 Xencuesta <- Xencuesta %>% left_join(., Variables.disenio,`copy` = TRUE,
                               by = c("Divipola"= "Divipola"))
 
 
-# Dominios
+# Domains
 
 Div = unique(Xcenso$departamento_etnia)
 
-# tamaño de muestra Ends y poblacionales
+# Sample sizes for Ends and Population
 
 n_d = Xencuesta %>% group_by(departamento_etnia) %>% summarise(nd = n()) %>%
   mutate_all(~replace(.,is.na(.),0)) %>% as.data.frame()
@@ -87,14 +77,11 @@ n_d = Xencuesta %>% group_by(departamento_etnia) %>% summarise(nd = n()) %>%
 N_d = Xcenso %>% lazy_dt() %>% group_by(departamento_etnia) %>% summarise(Nd = n()) %>% 
   as.data.frame()
 
-# COMMAND ----------
 
 # MODELO PARA CENSO
 ################################################################################
-                       ### Ajuste del modelo Plugin ###
+                       ### Fitting model for census ###
 ################################################################################
-
-###----------------------------- Modelo saturado ----------------------------###
 
 pluginreg  <- glmer(nec_ins ~ inasistencia  +   ocupada + 
                       edad_13_14 +
@@ -111,8 +98,11 @@ pluginreg  <- glmer(nec_ins ~ inasistencia  +   ocupada +
 
 
 
-  ###----------- Exportando los efectos fijos comunes a los dominios ----------###
+###----------- Exportando los efectos fijos comunes a los dominios ----------###
+saveRDS(pluginreg, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/PluginNI_model.rds"))
 
+
+pluginreg = readRDS(file.path(mount_point,"3. Modelos Plugin/Output/NI/PluginNI_model.rds"))
 betas = as.matrix(fixef(pluginreg))
 
 ###--- MSE ---###
@@ -121,10 +111,10 @@ sd.u = pluginreg@theta
 
 
 ################################################################################
-#### Modelo con efectos aleatorios de departamento_etnia
+### Model with Random Effects of Department_Ethnicity
 ################################################################################
 
-###------------ Construcción de la matriz censal sintética XBeta ------------###
+###------------ Construction of the Synthetic Census Matrix XBeta ------------###
 
 
 
@@ -134,102 +124,97 @@ matriz <- cbind.data.frame(Xcenso$departamento_etnia, cbind(1,as.matrix(Xcenso %
 colnames(matriz) <- c("Divipola","XB")
 
 
-###----------- Lista donde se guardarán las iteraciones bootstrap -----------###
+###----------- List where Bootstrap Iterations will be Saved -----------###
 
 plugin.estrella = list()
 
 B = 2#2000
 
-###--- Total de Municipios ---###
+###--- Total Municipalities ---###
 
 Div = unique(Xcenso$departamento_etnia)
 
-###--- Municipios en la encuesta ---###
+###--- Municipalities in the Survey ---###
 
 Div2 = unique(Xencuesta$departamento_etnia)
 
-
-# COMMAND ----------
-
-
+## The for loop for the bootstrap goes here
 for(b in 1:B){
   print(paste0('Iteracion:',b))
   
-  #----------------------------------------------------------------------------#
-  #--- Paso 1: generar los efectos aleatorios para los municipios en la ENDS --#
-  #----------------------------------------------------------------------------#
+  #-----------------------------------------------------------------------------#
+  #--- Step 1: Generate Random Effects for Municipalities in the ENDS ----------#
+  #-----------------------------------------------------------------------------#
   
   ud = data.frame(Divipola = Div2, ud = rnorm(length(Div2), 0, sd.u))
   
-  #-- Creando vector de efectos aleatorios para todos los municipios del país -#
+  #-- Creating a vector of random effects for all Municipalities in the country -#
   
   ud = data.frame(Divipola = Div) %>% left_join(ud, by = "Divipola")
   
-  #----- Si el municipio no fue encuestado tendrá un efecto aleatorio de 0 ----#
+  #----- If the Municipality was not surveyed, it will have a random effect of 0 ----#
   
   ud$ud[is.na(ud$ud)] <- 0
   
-  #----------------------------------------------------------------------------#
-  #-- Paso 2: Generar pseudocenso y estimador del parámetro a partir de este --#
-  #----------------------------------------------------------------------------#
-  
-  #---     Ubicación en la lista para almacenar el theta estimado en el     ---#
-  #---     pseudocenso y el obtenido en la muestra seleccionada de este     ---#
+#------------------------------------------------------------------------------#
+#-- Step 2: Generate Pseudocensus and Estimate the Parameter from it ----------#
+#------------------------------------------------------------------------------#
+
+#---     Location in the list to store the estimated theta in the       ---#
+#---     pseudocensus and obtained in the selected sample of this       ---#
   
   plugin.estrella[[b]] = cbind(theta.censo = numeric(nrow(ud)), 
                                theta.muestra = numeric(nrow(ud))) %>% 
     data.frame() %>% mutate(Codmun = ud$Divipola)
   
-  #- Censo con variable para generar la estimación de la probabilidad de NI -#
+  #- Census with variable to generate NI probability estimate. -#
   censoydi = cbind.data.frame(Xcenso$departamento_etnia, NA, Xcenso %>% as.data.table() %>% .[,c("Divipola") := NULL,])
   
   colnames(censoydi) <- c("Divipola", "Ydi", colnames(Xcenso %>% as.data.table() %>% .[,c("Divipola") := NULL,]))
   
-  #--- Para cada mujer del cada municipio se generan probabilidad de NI ---#
+  #--- For each woman in each municipality, the probability of NI is generated. ---#
   
   
   for(i in 1:length(Div)){
     print(paste0('Dominio:',i))
-    #--- Código del municipio ---#
+    #--- Municipality code ---#
     
     index = Div[i]
     
-    #--- Total poblacional del municipio ---#
+    #--- Total Population of the Municipality ---#
     
     N.d = N_d[N_d$departamento_etnia == index,]$Nd
     
-    #- Posición de matriz censal sintética XBeta que corresponde al municipio -#
+    #- Position in the Synthetic Census Matrix XBeta corresponding to the municipality -#
     
     pos = which(matriz$Divipola == index)
     
-    #- Probabilidad de que una mujer del municipio tenga NI de planificación -# 
+    #- Probability that a woman in the municipality has Family Planning Unmet Need -#
     
     theta.di = (exp(matriz[pos,2] + rep(ud[i,2], N.d))/
                   (1 + exp(matriz[pos,2] + rep(ud[i,2], N.d))))
     
-    #- Posición en la base censal que corresponde al municipio -#
+     #- Position in the Census Database corresponding to the municipality -#
     
     pos2 = which(censoydi$Divipola == index)
     
-    #- Generando la variable respuesta simulada a partir de la probabilidad -#
-    #-                de que una mujer del municipio tenga NI               -#
+    #- Generating the dummy response variable from the probability that a woman in the municipality has NI.  -#
     
     censoydi[pos2, 2] = rbinom(N.d, 1, theta.di)
     
-    #-  Estimación de la probabilidad de NI en las mujeres   -# 
-    #-              del municipio en el pseudocenso          -#
+    #---- Estimation of the probability of NI among women in the municipality in the pseudocensus.   -----#
     
     plugin.estrella[[b]][i,1] = (1/N.d) * sum(censoydi[pos2, 2])
   }
   
   
-  #----------------------------------------------------------------------------#
-  #-- Paso 3: Seleccionar muestra del pseudocenso y estimador del parámetro  --#
-  #--         a partir de la pseudomuestra                                   --#
-  #----------------------------------------------------------------------------#
+  #------------------------------------------------------------------------------#
+  #-- Step 3: Select a sample from the pseudocensus and estimate the parameter --#
+  #--         from the pseudosample                                            --#
+  #------------------------------------------------------------------------------#
   
-  #- Muestra del pseudocenso con tamaño que coincide con el número de mujeres -#
-  #-              seleccionada en la muestra municipios de la ENDS            -#
+  #- Sample from the pseudocensus with a size that matches the number of women -#
+  #-          selected in the sample of municipalities from the ENDS           -#
   
   muestra <- censoydi %>% left_join(n_d, by = c("Divipola"= "departamento_etnia")) %>%
     mutate(id_orig = 1:dim(censoydi)[1], Aleatorio = runif(dim(censoydi)[1])) %>%  
@@ -239,7 +224,7 @@ for(b in 1:B){
     filter(Seleccionado == "Seleccionado") %>% ungroup() %>% 
     arrange(id_orig) %>% dplyr::select(names(censoydi)) %>% as.data.frame()
   
-  #--------- Ajuste del modelo para la pseudo-muestra ---------#
+  #--------- Model fit for the pseudo-sample ---------#
   
   pluginbootstrap <- glmer(Ydi ~ inasistencia  +   ocupada + 
                              edad_13_14 +
@@ -254,11 +239,11 @@ for(b in 1:B){
                              electricidad_si + tipo_viv_casa_departamento +
                              (1|departamento_etnia), family = "binomial", data = muestra) 
   
-  ###---    Exportando los efectos fijos comunes en el modelo bootstrap   ---###
+  ###--- Exporting the common fixed effects in the bootstrap model ---###
   
   betasB = as.matrix(fixef(pluginbootstrap))
   
-  ###---- Exportando los efectos aleatorios para cada uno de los dominios ---###
+  ###---- Exporting the random effects for each of the domains ---###
   
   udB =  data.frame(Divipola = rownames(ranef(pluginbootstrap)$departamento_etnia), 
                     ud = ranef(pluginbootstrap)$departamento_etnia[[1]])
@@ -266,15 +251,15 @@ for(b in 1:B){
   rownames(udB) <- NULL
   
   
-  #-- Creando vector de efectos aleatorios para todos los municipios del país -#
+ #-- Creating a vector of random effects for all municipalities in the country -#
   
   udB = data.frame(Divipola = Div) %>% left_join(udB, by = "Divipola")
   
-  #----- Si el municipio no fue encuestado tendrá un efecto aleatorio de 0 ----#
+  #----- If the municipality was not surveyed, it will have a random effect of 0 ----#
   
   udB$ud[is.na(udB$ud)] <- 0
   
-  ##------------ Construcción de la matriz censal sintética XBeta ------------##
+ ##------------ Construction of the Synthetic Census Matrix XBeta ------------##
   
   matrizCenso <- cbind.data.frame(censoydi$Divipola, 
                                   cbind(1, as.matrix(censoydi %>% 
@@ -284,18 +269,18 @@ for(b in 1:B){
   
   censoydi$pluginB <- NA
   
-  #--- Estimaciones boostrap para cada dominio ---#
+ #--- Bootstrap Estimates for Each Domain ---#
   
   for(i in 1:length(Div)){
     
     index = which(censoydi$Divipola == Div[i])
     
-    #- Probabilidad de que una mujer del municipio tenga NI por individuo -#
+    #- Probability that a woman in the municipality has NI per individual. -#
     
     censoydi$pluginB[index] = exp(matrizCenso$XB[index] + udB[i,2])/
       (1 + exp(matrizCenso$XB[index] + udB[i,2]))
     
-    #- Probabilidad municipal de que una mujer tenga Uso de metodo -#
+    #- Municipal probability of a woman having Method use -#
     
     plugin.estrella[[b]][i,2] =  mean(censoydi$pluginB[index])
   }
@@ -304,10 +289,10 @@ for(b in 1:B){
 
 
 #------------------------------------------------------------------------------#
-#------------------------------ Estimación del ECM ----------------------------#
+#------------------------------  ECM  Estimation   ----------------------------#
 #------------------------------------------------------------------------------#
 
-#-- Promedio de las diferencias plugin pseudocenso - pseudomuestra bootstrap --# 
+#-- Average of the differences between plugin pseudocensus and bootstrap pseudosample --#
 library(purrr)
 
 NI_mse <- plugin.estrella %>% map_df(~.x %>% data.frame() %>% 
@@ -317,7 +302,7 @@ NI_mse <- plugin.estrella %>% map_df(~.x %>% data.frame() %>%
 
 
 #------------------------------------------------------------------------------#
-#--------------------- Exportando salidas: Estimación ECM ---------------------#
+#--------------------- Export Outputs: ECM Estimation -------------------------#
 #------------------------------------------------------------------------------#
 
 saveRDS(NI_mse %>% as.data.frame(), file = file.path(mount_point,"3. Modelos Plugin/Output/NI/NI_MSE_departamento_etnia.rds"))
@@ -334,23 +319,22 @@ N_d = Xcenso %>% lazy_dt() %>% group_by(Divipola) %>% summarise(Nd = n()) %>%
   as.data.frame()
 
 
-###----------- Lista donde se guardarán las iteraciones bootstrap -----------###
+###----------- List where Bootstrap Iterations will be Saved -----------###
 
 plugin.estrella2 = list()
 
 B = 1000
 
-###--- Total de Municipios ---###
+###--- Total Municipalities ---###
 
 Divv = unique(Xcenso$Divipola)
 
-###--- Municipios en la encuesta ---###
+###--- Municipalities in the Survey ---###
 
 Divv2 = unique(Xencuesta$Divipola)
 
-# COMMAND ----------
 
-###------------ Construcción de la matriz censal sintética XBeta ------------###
+###------------ Construction of the Synthetic Census Matrix XBeta ------------###
 
 matriz <- cbind.data.frame(Xcenso$Divipola, cbind(1,as.matrix(Xcenso %>%
                                                                 select(rownames(betas)[-1]))) %*% 
@@ -363,81 +347,79 @@ colnames(matriz) <- c("Divipola","XB")
 for(b in 1:B){
   print(b)
   
-  #----------------------------------------------------------------------------#
-  #--- Paso 1: generar los efectos aleatorios para los municipios en la ENDS --#
-  #----------------------------------------------------------------------------#
+  #-----------------------------------------------------------------------------#
+  #--- Step 1: Generate Random Effects for Municipalities in the ENDS ----------#
+  #-----------------------------------------------------------------------------#
   
   ud = data.frame(Divipola = Divv2, ud = rnorm(length(Divv2), 0, sd.u))
   
-  #-- Creando vector de efectos aleatorios para todos los municipios del país -#
+  #-- Creating a vector of random effects for all municipalities in the country -#
   
   ud = data.frame(Divipola = Divv) %>% left_join(ud, by = "Divipola")
   
-  #----- Si el municipio no fue encuestado tendrá un efecto aleatorio de 0 ----#
+  #----- If the municipality was not surveyed, it will have a random effect of 0 ----#
   
   ud$ud[is.na(ud$ud)] <- 0
   
-  #----------------------------------------------------------------------------#
-  #-- Paso 2: Generar pseudocenso y estimador del parámetro a partir de este --#
-  #----------------------------------------------------------------------------#
+  #------------------------------------------------------------------------------#
+  #-- Step 2: Generate Pseudocensus and Estimate the Parameter from it ----------#
+  #------------------------------------------------------------------------------#
   
-  #---     Ubicación en la lista para almacenar el theta estimado en el     ---#
-  #---     pseudocenso y el obtenido en la muestra seleccionada de este     ---#
+  #---     Location in the list to store the estimated theta in the       ---#
+  #---     pseudocensus and obtained in the selected sample of this       ---#
   
   plugin.estrella2[[b]] = cbind(theta.censo = numeric(nrow(ud)), 
                                 theta.muestra = numeric(nrow(ud))) %>% 
     data.frame() %>% mutate(Codmun = ud$Divipola)
   
-  #- Censo con variable para generar la estimación de la probabilidad de NI -#
+ #- Census with a variable to generate the estimation of the NI -#
   censoydi = cbind.data.frame(Xcenso$Divipola, NA, Xcenso %>% as.data.table() %>% .[,c("Divipola") := NULL,])
   
   colnames(censoydi) <- c("Divipola", "Ydi", colnames(Xcenso %>% as.data.table() %>% .[,c("Divipola") := NULL,]))
   
-  #--- Para cada mujer del cada municipio se generan probabilidad de NI ---#
+  #--- For each woman in each municipality, the probability of NI is generated. ---#
   
   
   for(i in 1:length(Divv)){
     print(i)
-    #--- Código del municipio ---#
+    #--- Municipality Code ---#
     
     index = Divv[i]
     
-    #--- Total poblacional del municipio ---#
+     #--- Total Population of the Municipality ---#
     
     N.d = N_d[N_d$Divipola == index,]$Nd
     
-    #- Posición de matriz censal sintética XBeta que corresponde al municipio -#
+    #- Position in the Synthetic Census Matrix XBeta corresponding to the municipality -#
     
     pos = which(matriz$Divipola == index)
     
-    #- Probabilidad de que una mujer del municipio tenga NI de planificación -# 
+    #- Probability that a woman in the municipality has planning NI. -# 
     
     theta.di = (exp(matriz[pos,2] + rep(ud[i,2], N.d))/
                   (1 + exp(matriz[pos,2] + rep(ud[i,2], N.d))))
     
-    #- Posición en la base censal que corresponde al municipio -#
+       #- Position in the Census Database corresponding to the municipality -#
     
     pos2 = which(censoydi$Divipola == index)
     
-    #- Generando la variable respuesta simulada a partir de la probabilidad -#
-    #-                de que una mujer del municipio tenga NI               -#
+    #- Generating the dummy response variable from the probability that a woman in the municipality has NI     -#
     
     censoydi[pos2, 2] = rbinom(N.d, 1, theta.di)
     
-    #-  Estimación de la probabilidad de NI en las mujeres   -# 
-    #-              del municipio en el pseudocenso          -#
+    #-  Estimation of the probability of NI among women in the municipality in the pseudocensus.      -#
     
     plugin.estrella2[[b]][i,1] = (1/N.d) * sum(censoydi[pos2, 2])
   }
   
   
   #----------------------------------------------------------------------------#
-  #-- Paso 3: Seleccionar muestra del pseudocenso y estimador del parámetro  --#
-  #--         a partir de la pseudomuestra                                   --#
+  #-- Step 3: Select a sample from the pseudocensus and estimate the parameter --
+  #--         from the pseudosample                                           --
   #----------------------------------------------------------------------------#
   
-  #- Muestra del pseudocenso con tamaño que coincide con el número de mujeres -#
-  #-              seleccionada en la muestra municipios de la ENDS            -#
+  #- Sample from the pseudocensus with a size that matches the number of women -#
+  #-          selected in the sample of municipalities from the ENDS          -#
   
   muestra <- censoydi %>% left_join(n_d, by = c("Divipola"= "Divipola")) %>%
     mutate(id_orig = 1:dim(censoydi)[1], Aleatorio = runif(dim(censoydi)[1])) %>%  
@@ -447,7 +429,7 @@ for(b in 1:B){
     filter(Seleccionado == "Seleccionado") %>% ungroup() %>% 
     arrange(id_orig) %>% select(names(censoydi)) %>% as.data.frame()
   
-  #--------- Ajuste del modelo para la pseudo-muestra ---------#
+ #--------- Fitting the model for the pseudo-sample ---------#
   
   pluginbootstrap <- glmer(Ydi ~ inasistencia  +   ocupada + 
                              edad_13_14 +
@@ -462,29 +444,28 @@ for(b in 1:B){
                              electricidad_si + tipo_viv_casa_departamento +
                              (1|departamento_etnia), family = "binomial", data = muestra) 
   
-  ###---    Exportando los efectos fijos comunes en el modelo bootstrap   ---###
+  ###--- Exporting the common fixed effects in the bootstrap model ---###
   
   betasB = as.matrix(fixef(pluginbootstrap))
   
-  ###---- Exportando los efectos aleatorios para cada uno de los dominios ---###
+  ###---- Exporting the random effects for each of the domains ---###
   
   udB =  data.frame(Divipola = as.character(Divv) ,
                     #rownames(ranef(pluginbootstrap)$Divipola), #aqui cambiar
                     ud = 0#ranef(pluginbootstrap)$Divipola[[1]]
-  )#aqui cambiar
+  )
   
   rownames(udB) <- NULL
-  #udB$Divipola <- as.numeric(udB$Divipola)
   
-  #-- Creando vector de efectos aleatorios para todos los municipios del país -#
+  #-- Creating a vector of random effects for all municipalities in the country -#
   
   udB = data.frame(Divipola = as.character(Divv)) %>% left_join(udB, by = "Divipola")
   
-  #----- Si el municipio no fue encuestado tendrá un efecto aleatorio de 0 ----#
+  #----- If the municipality was not surveyed, it will have a random effect of 0 ----#
   
   udB$ud[is.na(udB$ud)] <- 0
   
-  ##------------ Construcción de la matriz censal sintética XBeta ------------##
+  ##------------ Construction of the Synthetic Census Matrix XBeta ------------##
   
   matrizCenso <- cbind.data.frame(censoydi$Divipola, 
                                   cbind(1, as.matrix(censoydi %>% 
@@ -494,34 +475,34 @@ for(b in 1:B){
   
   censoydi$pluginB <- NA
   
-  #--- Estimaciones boostrap para cada municipio ---#
+  #--- Bootstrap Estimates for Each Municipality ---#
   
   for(i in 1:length(Divv)){
     
     index = which(censoydi$Divipola == Divv[i])
     
-    #- Probabilidad de que una mujer del municipio tenga NI por individuo -#
+    #- Probability that a woman in the municipality has NI per individual. -#
     
     censoydi$pluginB[index] = exp(matrizCenso$XB[index] + udB[i,2])/
       (1 + exp(matrizCenso$XB[index] + udB[i,2]))
     
-    #- Probabilidad municipal de que una mujer tenga NI -#
+    #- Municipal probability of a woman having NI -#
     
     plugin.estrella[[b]][i,2] =  mean(censoydi$pluginB[index])
   }
 }
 
 #------------------------------------------------------------------------------#
-#------------------------------ Estimación del ECM ----------------------------#
+#------------------------------  ECM Estimation    ----------------------------#
 #------------------------------------------------------------------------------#
 
-#-- Promedio de las diferencias plugin pseudocenso - pseudomuestra bootstrap --# 
+#-- Average of the differences between plugin pseudocensus and bootstrap pseudosample --#
 NI_mse <- plugin.estrella2 %>% map_df(~.x %>% data.frame() %>% 
                                         mutate(dif2 = (theta.censo - theta.muestra)^2)) %>% 
   group_by(Codmun) %>% summarise(ecm = mean(dif2))
 
 #------------------------------------------------------------------------------#
-#--------------------- Exportando salidas: Estimación ECM ---------------------#
+#--------------------- Exporting Outputs: ECM Estimation ----------------------#
 #------------------------------------------------------------------------------#
 
 saveRDS(NI_mse %>% as.data.frame(), file = file.path(mount_point,"3. Modelos Plugin/Output/NI/NI_MSE_Divipola.rds"))
