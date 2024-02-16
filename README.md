@@ -1,4 +1,5 @@
 ContraceptiveMethods_SAE
+
 Measuring access to contraceptive methods among ethnic groups using Small Area Estimation
 
 Abstract
@@ -12,5 +13,4 @@ The estimations reveal a direct relationship between the percentage of the ethni
 Keywords
 Family planning, unmet needs, ethnic gaps, sexual and reproductive rights, subnational indicators, contraceptive use
 
-The complete dataset used in this project is available . [link text]([URL](https://drive.google.com/drive/folders/15c7AR53WSpAiF2uLkc9-ettAWtKZNggj?usp=sharing)https://drive.google.com/drive/folders/15c7AR53WSpAiF2uLkc9-ettAWtKZNggj?usp=sharing)
-
+The complete dataset used in this project is available . [link text](https://drive.google.com/drive/folders/15c7AR53WSpAiF2uLkc9-ettAWtKZNggj?usp=sharing)
