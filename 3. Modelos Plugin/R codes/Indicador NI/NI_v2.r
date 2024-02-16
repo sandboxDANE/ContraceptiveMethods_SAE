@@ -1,19 +1,11 @@
-################################################################################
-##                     Proyecto MRP - Left No One Behind                      ##
-## Title:        Indicador de planificación familiar NI - Necesidad de método ##
-##               de planificación insatisfecha                                ##
-## Returns:      Estimación Plugin por dominios de interés                    ##
-## Author:       Felipe Molina & Andrés Gutiérrez & Diego Lemus               ##
-## Institution:  CEPAL                                                        ##
-## Date:         2021                                                         ##
-## División:     División de Estadísticas                                     ##
-## Disclaimer:   Estos códigos computacionales han sido programados con el    ##
-##               fin de ejemplificar las metodologías propuestas por CEPAL.   ##
-##               La responsabilidad del uso de los programas recae            ##
-##               completamente sobre  los funcionarios a quienes se hace      ##
-##               entrega. Se exime a la CEPAL de los errores que puedan ser   ##
-##               ocasionados por el uso incorrecto de estos códigos.          ##
-################################################################################
+######################################################################################################## 
+## Title:        Family Planning Indicator NI - Unmet Need for Planning Method.                       ##
+## Returns:      Estimation Plugin by Domains of Interest                                             ##  
+## The code was modified by Lina Sánchez, Sebastián Oviedo, DANE.                                     ## 
+## Carlos Rámirez,  Université de Montréal, Juliana Guerrero, World Bank.                             ##
+## The original code was developed by Felipe Molina, Andrés Gutiérrez and Diego Lemus in the MRP      ##                                               
+## Project - Left No One Behind, Institution: ECLAC, Division: Statistics Division.                   ##                                                 
+########################################################################################################
 
 ###--- Cleaning R environment ---###
 
@@ -39,7 +31,7 @@ select <- dplyr::select
 
 
 
-###------------ Definiendo el límite de la memoria RAM a emplear ------------###
+###------------ Defining the limit of RAM memory to be used------------###
 
 mount_point = "D:/SAE anticonceptivos/Colombia-UNFPA/"
 
@@ -53,34 +45,36 @@ options(encoding = "UTF-8", scipen = 999)
 
 Xencuesta <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XencuestaD.rds"))  %>% filter(unida == 1)
 
-###------------ Anexando los Senate Weights a la base de la ENDS ------------###
+###------------   Senate Weights                                 ------------###
 
 Xencuesta$Sweights <- nrow(Xencuesta) * Xencuesta$fexp/sum(Xencuesta$fexp)
 Xencuesta = Xencuesta %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 
-###--------------------------------- CENSO ----------------------------------###
+###--------------------------------- CENSUS ----------------------------------###
+
 Xcenso <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XcensoD.rds"))  %>% filter(unida == 1)
 Xcenso = Xcenso %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 Xcenso = Xcenso %>% mutate(`reconoce_etnia:misma_etnia_1` = reconoce_etnia*misma_etnia_1)
 
-###-------------------- Número de municipios en la ENDS ---------------------###
+###-------------------- Total number of municipalities in the NSDS ---------------------###
 
 sum(unique(Xencuesta$Divipola) %in% unique(Xcenso$Divipola))
 
-###----- Identificador de Municipio - Departamento por persona del censo ----###
+###----- Identification of Municipality - Department per census person ----###
 
 Municipio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/Municipio.rds"))
 
-###----- Variables diseño ----###
+###----- Desing variables ----###
 
 Variables.disenio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/variable_disenio_ENDS.rds"))
 Variables.disenio = Variables.disenio %>% mutate(log_Total_p = log(Total_p))
 
-###------------- Anexando el código Divipola a la base del Censo ------------###
+###------------- Appending the Divipola code to the Census database -------------###
 Xcenso <- Xcenso %>% left_join(., Variables.disenio,
                               by = c("Divipola"= "Divipola"))
 
-###--------------------- Listado de los 1122 municipios ---------------------###
+###------------- List of the 1122 municipalities -------------###
+
 Divipola <- Municipio %>% distinct(Divipola, .keep_all = T)
 
 Divipola$departamento = as.character(as.numeric(Divipola$departamento))
@@ -89,25 +83,27 @@ Divipola$municipio = as.character(as.numeric(Divipola$municipio))
 Xencuesta$departamento = as.character(as.numeric(Xencuesta$departamento))
 Xencuesta$municipio = as.character(as.numeric(Xencuesta$municipio))
 
-###------------ Anexando el código Divipola a la base de la ENDS ------------###
+###------------ Appending the Divipola code to the ENDS database  ------------###
+
 Xencuesta <- Xencuesta %>% left_join(., Variables.disenio,
                               by = c("Divipola"= "Divipola"))
 
-###--- Limpiando memoria ---###
+###--- Clearing memory ---###
+
 #rm(Municipio, Divipola)
 
 
-# NI - comparar con la tabla # 10.5.1.2
+# NI - To compare with the table # 10.5.1.2
 ni <- Xencuesta %>% filter(unida==1) %>% # mujeres unidas
   mutate(uso=ifelse(nec_ins %in% c(1),v005,0)) %>%  # demanda: unmet & met need
   summarise(per_uso=100*sum(uso)/sum(v005)) # 6.7
 ni
 
 ################################################################################
-                       ### Ajuste del modelo Plugin ###
+                         ### Fitting the Plug-in model###
 ################################################################################
 
-###----------------------------- Modelo saturado ----------------------------###
+###----------------------------- Saturated Model ----------------------------###
 
 pluginregSW_sat  <- glmer(nec_ins ~  inasistencia  +   ocupada + 
   edad_13_14 +
@@ -125,85 +121,82 @@ pluginregSW_sat  <- glmer(nec_ins ~  inasistencia  +   ocupada +
 
 
 #------------------------------------------------------------------------------#
-#----------------- Exportando salidas: Modelo Plugin ajustado -----------------#
+#----------------- Exporting outputs: Plugin model fitted     -----------------#
 #------------------------------------------------------------------------------#
 
-###--- Modelo saturado ---###
+###--- Saturated Model  ---###
 
 saveRDS(pluginregSW_sat, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/PluginNI_SW_Sat_Mun.rds"))
 
-################################################################################
-#----------------------- Estimación Plugin: indicador NI ----------------------#
-################################################################################
+#################################################################################
+#-----------------------  Plugin estimation: indicador NI ----------------------#
+#################################################################################
 
 pluginregSW_sat = readRDS(file.path(mount_point,"3. Modelos Plugin/Output/NI/PluginNI_SW_Sat_Mun.rds"))
 
 #------------------------------------------------------------------------------#
-#------------- Exportando los efectos fijos comunes a los dominios ------------#
+#------------- Exporting common fixed effects to domains           ------------#
 #------------------------------------------------------------------------------#
-
-###--- Modelo saturado ---###
 
 betasSW_sat = as.matrix(fixef(pluginregSW_sat))
 
 #------------------------------------------------------------------------------#
-#------- Exportando los efectos aleatorios para cada uno de los dominios ------#
+#------- Exporting the random effects for each of the domains            ------#
 #------------------------------------------------------------------------------#
 
-###--- Modelo saturado ---###
 
 udSW_sat = cbind.data.frame(indice = rownames(ranef(pluginregSW_sat)$departamento_etnia),
                             ud = ranef(pluginregSW_sat)$departamento_etnia[[1]])
 
 #------------------------------------------------------------------------------#
-#-------------- En esta sección se emplea solo el modelo saturado -------------#
+#-------------- In this section, only the saturated model is used -------------#
 #------------------------------------------------------------------------------#
 
-###------------ Construcción de la matriz censal sintética XBeta ------------###
+###------------ Construction of the Synthetic Census Matrix XBeta ------------###
 
 mat_CensoSW_sat <- cbind.data.frame(Xcenso$departamento_etnia, cbind(1,as.matrix(Xcenso %>%
                                     select(rownames(betasSW_sat)[-1]))) %*% 
                                     betasSW_sat)
 colnames(mat_CensoSW_sat) <- c("Divipola","XB")
 
-#- Creando el vector nulo para ser reemplazado en el ciclo de estimación Plugin -#
+#- Creating the Null Vector to be Replaced in the Plugin Estimation Cycle -#
 
 Xcenso$pluginNI = numeric(5980476)
 
-#-- Códigos de los municipios en el censo para el ciclo de estimación Plugin --#
+#-- Municipality Codes in the Census for the Plugin Estimation Cycle -----#
 
 Div = unique(Xcenso$departamento_etnia)
 
-###---------- Ciclo de estimación plugin por individuo en el censo ----------###
+###---------- Individual Census Plugin Estimation Cycle ----------###
 
 for(i in 1:length(Div)){
   
   print(i)
   
-  ### Identificación del dominio ###
+  ###--- Domain Identification ---###
   
   index = which(Xcenso$departamento_etnia == Div[i])
   
-  ###--- Estimación en las áreas muestreadas por la ENDS ---###
+  ###--- Estimation in the Areas Sampled by the ENDS ---###
   
   if(Div[i] %in% udSW_sat$indice){
     
-    ###--- Seleccionando el efecto aleatorio del dominio ---###
+    ###--- Selecting the Random Effect of the Domain ---###
     
     u = udSW_sat$ud[which(as.character(udSW_sat$indice) == Div[i])]
     
-    ###---Probabilidad de uso de algún método anticonceptivo ---###
+    ###--- Probability of Using Any Contraceptive Method ---###
     
     Xcenso$pluginNI[index] = exp(mat_CensoSW_sat$XB[index] + u)/
                              (1 + exp(mat_CensoSW_sat$XB[index] + u))
     
     print(paste(Div[i], "muestreada"))
     
-    ###--- Estimación en áreas no muestreadas por la ENDS ---###
+    ###--- Estimation in Non-Sampled Areas by the ENDS ---###
     
   }else{
     
-    ###---Probabilidad de uso de algún método anticonceptivo ---###
+    ###--- Probability of Using Any Contraceptive Method ---###
     
     Xcenso$pluginNI[index] = exp(mat_CensoSW_sat$XB[index])/
                              (1 + exp(mat_CensoSW_sat$XB[index]))
@@ -212,23 +205,23 @@ for(i in 1:length(Div)){
   }
 }
 
-###-- Proporción de mujeres con necesidades de planificación insatisfechas --###
-###--------------------- Estimación plugin departamental --------------------### 
+###------------- Proportion of women with unmet planning needs  -------------###
+###--------------------- Departmental Plugin Estimation --------------------###
 
 depto <- Xcenso %>% group_by(departamento) %>% summarise(NI = mean(pluginNI))
 
 
-###----------------------- Estimación plugin municipal ----------------------###
+###-----------------------  Plugin Estimation by Municipal ----------------------###
 
 municipio <- Xcenso %>% group_by(Divipola) %>%
   summarise(NI = mean(pluginNI, na.rm = T))
 
-###----------------------- Estimación plugin por etnia ----------------------###
+###-----------------------  Plugin Estimation by Ethnicity ----------------------###
 
 etnia <- Xcenso %>% group_by(etnia) %>%
   summarise(NI = mean(pluginNI, na.rm = T))
 
-###----------------- Estimación plugin: Departamento X etnia ----------------###
+###----------------- Plugin Estimation: Department X Ethnicity ------------------###
 
 municipio_etnia <- Xcenso %>% group_by(Divipola, etnia) %>%
   summarise(NI = mean(pluginNI, na.rm = T))
@@ -240,18 +233,17 @@ municipio_etnia <- Xcenso %>% group_by(Divipola, etnia) %>%
 ################################################################################
 
 ###--------------------------------------------------------------------------###
-###   Proporción de mujeres con necesidades de planificación insatisfechas   ### 
-###                           reportado por la ENDS                          ###                         
+###    Proportion of women with unmet planning needs as reported by the NSDS ###                         
 ###--------------------------------------------------------------------------###
 
 medias <- numeric(36)
 
-###--- Nacional ---###
+###--- National ---###
 
 medias[1] <- Xencuesta %>% summarise(p = weighted.mean(nec_ins, fexp)) %>% 
   as.numeric()
 
-###--- Urbana ---###
+###--- Urban ---###
 
 medias[2] <- Xencuesta %>% filter(area_urbano == 1) %>% 
   summarise(p = weighted.mean(nec_ins, fexp)) %>% as.numeric()
@@ -261,14 +253,14 @@ medias[2] <- Xencuesta %>% filter(area_urbano == 1) %>%
 medias[3] <- Xencuesta %>% filter(area_rural == 1) %>% 
   summarise(p = weighted.mean(nec_ins,fexp)) %>% as.numeric()
 
-###--- Departamento ---###
+###--- Department ---###
 
  medias[4:36] <- Xencuesta %>% group_by(departamento) %>% 
    summarise(p = weighted.mean(nec_ins,fexp)) %>% mutate(depto = as.numeric(as.character(departamento))) %>% arrange(depto) %>% 
 select(p) %>% unlist(use.names = FALSE)
 
 
-###-------------------------- Matriz de calibración -------------------------###
+###-------------------------- Calibration Matrix -------------------------###
 
 MatrizCalibrada <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/MatrizCalibrada.rds")) %>% as.data.frame() %>% as.data.frame() %>% #sample_n(100) %>%
              left_join(Xcenso %>% select(idpers,unida), by = "idpers") %>% filter(is.na(unida) == F)
@@ -278,7 +270,7 @@ MatrizCalibrada = MatrizCalibrada %>% select(unos,names(MatrizCalibrada)[3:37])
 names(MatrizCalibrada)
 
 
-###------------------------ Función de pesos Benchmark ----------------------###
+###------------------------Weigths Benchmark Function ----------------------###
 
 Benchmark <- function(CensoY){
   library(sampling)
@@ -295,51 +287,53 @@ Benchmark <- function(CensoY){
 }
 
 
-###--- Anexando pesos Benchmark al censo ---###
+###-------------------- Appending Benchmark Weights to the Census -----------###
+
 Xcenso$pesos_NI <- Benchmark(Xcenso$pluginNI)
 summary(Xcenso$pesos_NI)
 
 
-###---------------------- Estimación benchmark Nacional ---------------------###
+###----------------------  Benchmark Estimation Nacional ---------------------###
 
 NI_Nal <- Xcenso %>% summarise(NI_2020 = mean(pluginNI),
                                NIB_2020 = weighted.mean(pluginNI, pesos_NI))  %>% as.data.frame()
 
 
-###-------------------- Estimación benchmark Departamental ------------------###
+###----------------------  Benchmark Estimation Department ---------------------###
+
 
 NI_depto <- Xcenso %>% group_by(departamento) %>%
   summarise(NI_2020 = mean(pluginNI),
             NIB_2020 = weighted.mean(pluginNI, pesos_NI))  %>% as.data.frame()
 
-###-------------------- Estimación benchmark Municipal ------------------###
+###----------------------  Benchmark Estimation Municipality -------------------###
 
 NI_Mun <- Xcenso %>% group_by(departamento, Divipola) %>%
   summarise(NI_2020 = mean(pluginNI),
             NIB_2020 = weighted.mean(pluginNI, pesos_NI))  %>% as.data.frame()
 
 
-###---------------------- Estimación benchmark Clase ---------------------###
+###----------------------  Benchmark Estimation Class ---------------------###
 
 NI_clase <- Xcenso %>% group_by(area_urbano) %>% summarise(D6_2020 = mean(pluginNI),
                                D6B_2020 = weighted.mean(pluginNI, pesos_NI))  %>% as.data.frame()
 
 
-###---------------------- Estimación benchmark Edad ---------------------###
+###----------------------  Benchmark Estimation Age ---------------------###
 
 NI_edad <- Xcenso %>% group_by(edad) %>% summarise(D6_2020 = mean(pluginNI),
                                D6MB_2020 = weighted.mean(pluginNI, pesos_NI))  %>% as.data.frame()
 
 
 
-###---------------------- Estimación benchmark por etnia --------------------###
+###----------------------  Benchmark Estimation Ethnicity ---------------------###
 
 NI_dominio <- Xcenso %>% group_by(etnia) %>% 
               summarise(NI_2020 = mean(pluginNI),
                         NIB_2020 = weighted.mean(pluginNI, pesos_NI))  %>% as.data.frame()
 
 
-###-------------------- Estimación benchmark por departamento  etnia ------------------###
+###----------------------  Benchmark Estimation Department x Ethnicity ---------------------###
 
 NI_departamento_etnia <- Xcenso %>% group_by(departamento_etnia) %>% 
   summarise(NI_2020 = mean(pluginNI),
@@ -351,28 +345,28 @@ NI_departamento_etnia <- Xcenso %>% group_by(departamento_etnia) %>%
 
 saveRDS(NI_Nal, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Nacional.rds"))
 
-###--- Etnia ---###
+###--- Ethnicity ---###
 
 saveRDS(NI_dominio, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Etnia.rds"))
 
-###--- Municipio ---###
+###--- Municipality ---###
 
 saveRDS(NI_Mun, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Municipio.rds"))
 
-###--- Departamento ---###
+###--- Department ---###
 
 saveRDS(NI_depto, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Departamento.rds"))
 
-###--- Departamento x etnia ---###
+###--- Department x Ethnicity ---###
 
 saveRDS(NI_departamento_etnia, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Departamento_etnia.rds"))
 
 
-###--- Edad ---###
+###--- Age ---###
 
 saveRDS(NI_edad, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Edad.rds"))
 
-###--- Edad ---###
+###--- Class ---###
 
 saveRDS(NI_clase, file = file.path(mount_point,"3. Modelos Plugin/Output/NI/Clase.rds"))
 
