@@ -1,26 +1,17 @@
-
-################################################################################
-##                     Proyecto MRP - Left No One Behind                      ##
-## Title:        Indicador de planificación familiar D6 - Uso de algún método ##
-##               de planificación                                             ##
-## Returns:      Estimación Plugin por dominios de interés                    ##
-## Author:       Felipe Molina & Andrés Gutiérrez & Diego Lemus               ##
-## Institution:  CEPAL                                                        ##
-## Date:         2021                                                         ##
-## División:     División de Estadísticas                                     ##
-## Disclaimer:   Estos códigos computacionales han sido programados con el    ##
-##               fin de ejemplificar las metodologías propuestas por CEPAL.   ##
-##               La responsabilidad del uso de los programas recae            ##
-##               completamente sobre  los funcionarios a quienes se hace      ##
-##               entrega. Se exime a la CEPAL de los errores que puedan ser   ##
-##               ocasionados por el uso incorrecto de estos códigos.          ##
-################################################################################
+######################################################################################################## 
+## Title:        Family Planning Indicator D7 - Use of long-lasting anticonceptual methods.           ##
+## Returns:      Estimation Plugin by Domains of Interest                                             ##  
+## The code was modified by Lina Sánchez, Sebastián Oviedo, DANE.                                     ## 
+## Carlos Rámirez,  Université de Montréal, Juliana Guerrero, World Bank.                             ##
+## The original code was developed by Felipe Molina, Andrés Gutiérrez and Diego Lemus in the MRP      ##                                               
+## Project - Left No One Behind, Institution: ECLAC, Division: Statistics Division.                   ##                
+########################################################################################################
 
 ###--- Cleaning R environment ---###
 
 #rm(list = ls())
 #gc()
-install.packages('corr')
+
 #################
 ### Libraries ###
 #################
@@ -39,7 +30,7 @@ library(corr)
 #library(StatisticalModels)
 library(MASS)
 
-###------------ Definiendo el límite de la memoria RAM a emplear ------------###
+###------------ Defining the limit of RAM memory to be used------------###
 
 memory.limit(160000000)
 
@@ -49,47 +40,42 @@ memory.limit(160000000)
 
 options(encoding = "UTF-8", scipen = 999)
 
-# COMMAND ----------
 
 mount_point = "D:/SAE anticonceptivos/Colombia-UNFPA/"
 
 ###---------------------------------- ENDS ----------------------------------###
 
-#Xencuesta <- readRDS("/Volumes/Macintosh HD/Backup_2021_Azure/Colombia-UNFPA/1. ConciliarBases/Output/XencuestaD.rds")  %>% filter(unida == 1)
-
-
 Xencuesta <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XencuestaD.rds"))  %>% filter(unida == 1)
 
-###------------ Anexando los Senate Weights a la base de la ENDS ------------###
+###------------   Senate Weights                                 ------------###
 
 Xencuesta$Sweights <- nrow(Xencuesta) * Xencuesta$fexp/sum(Xencuesta$fexp)
 Xencuesta = Xencuesta %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 
-###--------------------------------- CENSO ----------------------------------###
+###--------------------------------- CENSUS ----------------------------------###
 
 Xcenso <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/XcensoD.rds"))  %>% filter(unida == 1)
 Xcenso = Xcenso %>% mutate(reconoce_etnia = ifelse(etnia == "Ningun_grupo", 0, 1))
 Xcenso = Xcenso %>% mutate(`reconoce_etnia:misma_etnia_1` = reconoce_etnia*misma_etnia_1)
 
-#Xcenso = sample_n(Xencuesta, 10000)
 Xcenso = Xcenso %>% mutate(`reconoce_etnia:misma_etnia_1` = reconoce_etnia*misma_etnia_1)
 
-###----- Identificador de Municipio - Departamento por persona del censo ----###
+###----- Identification of Municipality - Department per census person ----###
 
 Municipio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/Municipio.rds")) 
 
-###----- Variables diseño ----###
+###------------- Desing variables -----------------------------------------###
 
 Variables.disenio <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/variable_disenio_ENDS.rds"))
 Variables.disenio = Variables.disenio %>% mutate(log_Total_p = log(Total_p))
 
 
 
-###------------- Anexando el código Divipola a la base del Censo ------------###
+###------------- Appending the Divipola code to the Census database -------------###
 Xcenso <- Xcenso  %>% left_join(., Variables.disenio,
                               by = c("Divipola"= "Divipola"))
 
-###--------------------- Listado de los 1122 municipios ---------------------###
+###------------- List of the 1122 municipalities -------------###
 
 Divipola <- Municipio %>% distinct(Divipola, .keep_all = T)
 Divipola$departamento = as.character(as.numeric(Divipola$departamento))
@@ -98,12 +84,12 @@ Divipola$municipio = as.character(as.numeric(Divipola$municipio))
 Xencuesta$departamento = as.character(as.numeric(Xencuesta$departamento))
 Xencuesta$municipio = as.character(as.numeric(Xencuesta$municipio))
 
-###------------ Anexando el código Divipola a la base de la ENDS ------------###
+###------------ Appending the Divipola code to the ENDS database  ------------###
 
 Xencuesta <- Xencuesta %>% left_join(., Variables.disenio,
                               by = c("Divipola"= "Divipola"))
 
-###------------ Anexando el la variable dependiente categorica   ------------###
+###------------ Annexing the categorical dependent variable   ------------###
 
 Xencuesta <- Xencuesta %>% mutate(larga_duracion = ifelse(tipo_met %in% c(6, 7),'4_Permanentes',
                                                           ifelse(tipo_met %in% c(11, 2),'3_Larga',
@@ -131,7 +117,7 @@ cor(Xencuesta3[,c("larga_duracion_2n", "inasistencia", "ocupada", "edad_13_14", 
                   "tipo_viv_casa_departamento", "escolaridad_primaria")])
 
 
-###--- Limpiando memoria ---###
+###--- Clearing Memory ---###
 rm(Municipio, Divipola)
 
 #1 Pill                                 11 NorplantTM or implants
@@ -147,27 +133,27 @@ rm(Municipio, Divipola)
 
 
 ###############################################################################
-## uso y demanda de métodos anticonceptivos
+## use and demand for contraceptive methods
 ###############################################################################
-# uso metodos - Uso de metodos de larga duracion
+# uso metodos - Use of long term methodologies
 ld <- Xencuesta  %>% #group_by(area_urbano) %>% #filter(v502==1) %>% # mujeres unidas
   mutate(ld = ifelse(larga_duracion %in% c('3_Larga'),v005,0)) %>%  # actualmente usa algún método
   summarise(per_uso=100*sum(ld)/sum(v005)) # 10.1274
 
 ld
 
-# ld depto
+# ld by depto
 
 ld_depto <- Xencuesta %>%  group_by(departamento)%>% #filter(unida==1) %>% # mujeres unidas
   mutate(uso=ifelse(larga_duracion %in% c('1_NoUse'),v005,0)) %>%  # actualmente usa algún método moderno
   summarise(per_uso=100*sum(uso)/sum(v005)) %>% as.data.frame() # 75.9
 ld_depto
 
+################################################################################
+                         ### Fitting the Plug-in model###
+################################################################################
 
-################################################################################
-                       ### Ajuste del modelo Plugin ###
-################################################################################
- Xencuesta[is.na(Xencuesta)] = 0
+Xencuesta[is.na(Xencuesta)] = 0
 library(ordinal)
 pluginreg <- clmm2(factor(larga_duracion_2) ~ inasistencia  +   ocupada + 
                edad_13_14 +
@@ -185,7 +171,7 @@ pluginreg <- clmm2(factor(larga_duracion_2) ~ inasistencia  +   ocupada +
 summary(pluginreg)
 
 #------------------------------------------------------------------------------#
-#----------------- Exportando salidas: Modelo Plugin ajustado -----------------#
+#----------------- Exporting outputs: Plugin model fitted     -----------------#
 #------------------------------------------------------------------------------#
 
 saveRDS(pluginreg, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/PluginLD2SW_Mun.rds"))
@@ -198,88 +184,74 @@ pluginreg = readRDS(file.path(mount_point,"3. Modelos Plugin/Output/LD/PluginLD2
 
 
 #------------------------------------------------------------------------------#
-#------------- Exportando los efectos fijos comunes a los dominios ------------#
+#------------- Exporting common fixed effects to domains           ------------#
 #------------------------------------------------------------------------------#
 
 betas = as.matrix(pluginreg$beta)
 
 #------------------------------------------------------------------------------#
-#------- Exportando los efectos aleatorios para cada uno de los dominios ------#
+#------- Exporting the random effects for each of the domains            ------#
 #------------------------------------------------------------------------------#
 
-###--- Modelo saturado ---###
+###--- Saturated Model ---###
 
 udSW = cbind.data.frame(indice = levels(as.factor(Xencuesta$departamento_etnia)),
                         ud = pluginreg$ranef)
 
-#udSW
-
 
 #------------------------------------------------------------------------------#
-#-------------- En esta sección se emplea solo el modelo saturado -------------#
+#-------------- In this section only the saturated model is used. -------------#
 #------------------------------------------------------------------------------#
 select = dplyr::select
-###------------ Construcción de la matriz censal sintética XBeta ------------###
+###------------ Construction of the Synthetic Census Matrix XBeta ------------###
 
 mat_CensoSW <- cbind.data.frame(Xcenso$departamento_etnia, cbind(as.matrix(Xcenso %>%
                                     select(rownames(betas)))) %*% 
                                     betas)
 colnames(mat_CensoSW) <- c("Divipola","XB")
 
-#-  Interceptos para cada modelo                                                 -#
+#-  Intercepts for each model                                                 -#
 
 mat_CensoSW$Alpha1_2 = pluginreg$Alpha[[1]]
-#mat_CensoSW$Alpha2_3 = pluginreg$Alpha[[2]]
-#mat_CensoSW$Alpha3_4 = pluginreg$Alpha[[3]]
 
-#- Creando el vector nulo para ser reemplazado en el ciclo de estimación Plugin -#
+#- Creating the Null Vector to be Replaced in the Plugin Estimation Cycle -#
 
-Xcenso$pluginLD_1 = rep(0,5980476)#numeric(5980476)
-#Xcenso$pluginLD_2 = rep(0,5980476)
-#Xcenso$pluginLD_3 = rep(0,5980476)
-#-- Códigos de los municipios en el censo para el ciclo de estimación Plugin --#
+Xcenso$pluginLD_1 = rep(0,5980476)
+
+#-- Municipality Codes in the Census for the Plugin Estimation Cycle --#
 
 Div = unique(Xcenso$departamento_etnia)
 
-
-
-###---------- Ciclo de estimación plugin por individuo en el censo ----------###
-###----------   En esta sección se emplea solo el modelo saturado  ----------###
+###---------- Individual Census Plugin Estimation Cycle ----------###
 
 for(i in 1:length(Div)){
   
   print(i)
 
-  ### Identificación del dominio ###
+  ###--- Domain Identification ---###
   
   index = which(Xcenso$departamento_etnia == Div[i])
   
-  ###--- Estimación en las áreas muestreadas por la ENDS ---###
+  ###--- Estimation in the Areas Sampled by the ENDS ---###
   
   if(Div[i] %in% udSW$indice){
-   
-    ###--- Seleccionando el efecto aleatorio del dominio ---###
+    
+  ###--- Selecting the Random Effect of the Domain ---###
     
     u = udSW$ud[which(as.character(udSW$indice) == Div[i])]
     
-    ###---Probabilidad de uso de algún método anticonceptivo ---###
+    ###--- Probability of Using Any Contraceptive Method ---###
     
     Xcenso$pluginLD_1[index] = exp(  mat_CensoSW$Alpha1_2[index] - mat_CensoSW$XB[index] + u )/
                                  (1 + exp( mat_CensoSW$Alpha1_2[index] - mat_CensoSW$XB[index] + u ))
-    
-    #Xcenso$pluginLD_2[index] = exp( mat_CensoSW$Alpha2_3[index] - mat_CensoSW$XB[index] + u)/
-    #                             (1 + exp( mat_CensoSW$Alpha2_3[index] - mat_CensoSW$XB[index] + u))
-    
-    #Xcenso$pluginLD_3[index] = exp(  mat_CensoSW$Alpha3_4[index] - mat_CensoSW$XB[index] + u)/
-    #                              (1 + exp( mat_CensoSW$Alpha3_4[index] - mat_CensoSW$XB[index] + u ))
-    
+        
    print(paste(Div[i], "muestreada"))
     
   ###--- Estimación en áreas no muestreadas por la ENDS ---###
     
   }else{
     
-    ###---Probabilidad de uso de algún método anticonceptivo ---###
+    ###--- Estimation in Non-Sampled Areas by the ENDS ---###
     
     Xcenso$pluginLD[index] = exp(mat_CensoSW$XB[index])/
                                  (1 + exp(mat_CensoSW$XB[index]))
@@ -289,28 +261,27 @@ for(i in 1:length(Div)){
 }
 
 Xcenso = Xcenso %>% mutate(LD1 = pluginLD_1,
-                           #LD2 = pluginLD_2 - pluginLD_1,
-                           #LD3 = pluginLD_3 - pluginLD_2,
                             LD2 = 1 - pluginLD_1,)
 
-###------------ Proporción de uso de algún método anticonceptivo ------------###
-###--------------------- Estimación plugin departamental --------------------### 
+
+###--------------------- Departmental Plugin Estimation --------------------###
+
 
 depto <- Xcenso %>% group_by(departamento) %>% summarise(Larga = mean(LD1),
                                                          Corta = mean(LD2))
 
-###----------------------- Estimación plugin municipal ----------------------###
+###--------------------- Municipality Plugin Estimation --------------------###
 
 municipio <- Xcenso %>% group_by(Divipola) %>%  summarise(Larga = mean(LD1),
                                                           Corta = mean(LD2))
 
-###----------------------- Estimación plugin por etnia ----------------------###
+###----------------------- Plugin Estimation by Ethnicity ----------------------###
 
 etnia <- Xcenso %>% group_by(etnia) %>%  summarise(Larga = mean(LD1),
                                                    Corta = mean(LD2))
 
 
-###----------------- Estimación plugin: Departamento X etnia ----------------###
+###----------------- Plugin Estimation: Department X Ethnicity ----------------###
 
 municipio_etnia <- Xcenso %>% group_by(departamento, etnia) %>% summarise(Larga = mean(LD1),
                                                                           Corta = mean(LD2))
@@ -318,19 +289,19 @@ municipio_etnia <- Xcenso %>% group_by(departamento, etnia) %>% summarise(Larga 
 
 
 ###--------------------------------------------------------------------------###
-###    Proporción de uso de métodos anticonceptivos reportado por la ENDS    ###
+###    Proportion of contraceptive method use reported by the ENDS           ###
 ###--------------------------------------------------------------------------###
- ### Funcion para cakcular medias por cada nivel###
+ ### Function to calculate averages for each level ###
 mediasc = function(nivel){
   medias <- numeric(36)
   
-  ###--- Nacional ---###
+  ###--- National ---###
   Xencuesta = Xencuesta %>%  mutate( grupo = ifelse(larga_duracion_2 == nivel, 1, 0) )
   medias[1] <- Xencuesta  %>% 
     summarise(p = weighted.mean(grupo, fexp)) %>% 
     as.numeric()
   
-  ###--- Urbana ---###
+  ###--- Urban ---###
   
   medias[2] <- Xencuesta %>% filter(area_urbano == 1 ) %>% 
     summarise(p = weighted.mean(grupo, fexp)) %>% as.numeric()
@@ -340,7 +311,7 @@ mediasc = function(nivel){
   medias[3] <- Xencuesta %>% filter(area_rural == 1) %>% 
     summarise(p = weighted.mean(grupo,fexp)) %>% as.numeric()
   
-  ###--- Departamento ---###
+  ###--- Department ---###
   
   medias[4:36] <- Xencuesta %>% 
     group_by(departamento) %>% 
@@ -356,14 +327,14 @@ medias = mediasc('2_Corta')
 medias
 
 
-###-------------------------- Matriz de calibración -------------------------###
+###-------------------------- Calibration Matrix -------------------------###
 
 MatrizCalibrada <- readRDS(file.path(mount_point,"1. ConciliarBases/Output/MatrizCalibrada.rds")) %>% as.data.frame() %>% #sample_n(100) %>%
              left_join(Xcenso %>% select(idpers,unida), by = "idpers") %>% filter(is.na(unida) == F)
 MatrizCalibrada$unos = 1
 MatrizCalibrada = MatrizCalibrada %>% select(unos,names(MatrizCalibrada)[3:37])
 
-###------------------------ Función de pesos Benchmark ----------------------###
+###------------------------Weigths Benchmark Function ----------------------###
 
 Benchmark <- function(CensoY, media){
   library(sampling)
@@ -374,7 +345,7 @@ Benchmark <- function(CensoY, media){
   a = calib(Xs = MatrizCalibrada2, 
            # d = runif( dim(MatrizCalibrada)[1], 0, 1), 
             d = rep(1, dim(MatrizCalibrada)[1]), 
-            #q = media,
+           
            total=media,
             method = c("logit"),
            # bounds=c(0,7),
@@ -385,7 +356,7 @@ Benchmark <- function(CensoY, media){
 }
 
 
-###--- Anexando pesos Benchmark al censo ---###
+###------------ Appending Benchmark Weights to the Census -------------###
 
 total=c(t(rep(1,nrow(MatrizCalibrada)))%*%as.matrix(MatrizCalibrada))
 
@@ -401,16 +372,8 @@ summary(Xcenso$pesos_CortaD)
 gc()
 
 
+###----------------------  Benchmark Estimation Nacional ---------------------###
 
-
-#Xcenso = Xcenso %>% mutate(total_pesos  =  pesos_CortaD +pesos_LagaD ,
-#                           pesos_CortaD = pesos_CortaD/total_pesos,
-#                           pesos_LagaD  = pesos_LagaD/total_pesos)
-
-#summary(Xcenso$pesos_CortaD)
-#summary(Xcenso$pesos_LagaD)
-
-###---------------------- Estimación benchmark Nacional ---------------------###
 Corta_Nal <- Xcenso %>% summarise(Corta_2020 = mean(LD2),
                                   CortaB_2020 = weighted.mean(LD2, pesos_CortaD), gr = 'Corta_Nal')
 
@@ -420,7 +383,8 @@ Nal= Reduce(bind_rows, list(Corta_Nal,Larga_Nal )) %>% as.data.table() %>%
   melt.data.table(.,id.vars = c('gr')) %>% .[is.na(value) == F] 
 
 
-###---------------------- Estimación benchmark Clase ---------------------###
+###--------------------  Benchmark Estimation Class ------------------###
+
 Corta_clase <- Xcenso %>% group_by(area_urbano) %>%summarise(Corta_2020 = mean(LD2),
                                                              CortaB_2020 = weighted.mean(LD2, pesos_CortaD), gr = 'Corta_clase')
 
@@ -431,7 +395,7 @@ Larga_clase <- Xcenso %>% group_by(area_urbano) %>%summarise(Larga_2020 = mean(L
 Clase= Reduce(bind_rows, list(Corta_clase,Larga_clase)) %>% as.data.table() %>% 
                 melt.data.table(.,id.vars = c('gr', 'area_urbano')) %>% .[is.na(value) == F] 
 
-###---------------------- Estimación benchmark Edad ---------------------###
+###--------------------  Benchmark Estimation Age ------------------###
 
 
 
@@ -447,7 +411,7 @@ Edad = Reduce(bind_rows, list(Corta_edad,Larga_edad )) %>% as.data.table() %>%
   melt.data.table(.,id.vars = c('gr','edad')) %>% .[is.na(value) == F] 
 
 
-###-------------------- Estimación benchmark Municipal ------------------###
+###--------------------  Benchmark Estimation Municipality ------------------###
 
 Corta_Mun  <- Xcenso %>% group_by(departamento,Divipola) %>%summarise(Corta_2020 = mean(LD2),
                                                      CortaB_2020 = weighted.mean(LD2, pesos_CortaD), gr = 'Corta_Mun')
@@ -459,7 +423,7 @@ Larga_Mun  <- Xcenso %>%group_by(departamento,Divipola) %>%summarise(Larga_2020 
 Municipio = Reduce(bind_rows, list(Corta_Mun,Larga_Mun )) %>% as.data.table() %>% 
   melt.data.table(.,id.vars = c('gr','departamento','Divipola')) %>% .[is.na(value) == F] 
 
-###-------------------- Estimación benchmark por etnia ------------------###
+###--------------------  Benchmark Estimation Ethnicity ------------------###
 
 Corta_Etnia  <- Xcenso %>% group_by(etnia) %>%summarise(Corta_2020 = mean(LD2),
                                                                       CortaB_2020 = weighted.mean(LD2, pesos_CortaD), gr = 'Corta_Etnia')
@@ -470,7 +434,7 @@ Larga_Etnia  <- Xcenso %>% group_by(etnia) %>%summarise(Larga_2020 = mean(LD1),
 Etnia = Reduce(bind_rows, list(Corta_Etnia,Larga_Etnia ))  %>% as.data.table() %>% 
   melt.data.table(.,id.vars = c('gr','etnia')) %>% .[is.na(value) == F] 
 
-###-------------------- Estimación benchmark por departamento  etnia ------------------###
+###--------------------  Benchmark Estimation department x Ethnicity ------------------###
 
 
 Corta_departamento_etnia  <- Xcenso %>% group_by(departamento_etnia) %>%summarise(Corta_2020 = mean(LD2),
@@ -489,29 +453,29 @@ rm( Corta_departamento_etnia, Larga_departamento_etnia)
 #Cuadro 8.4.1.1 - Distribución % de mujeres unidas
 #----------------- Exporting Plugin estimates for post-stratum ----------------#
 
-###--- Etnia ---###
+###--- Ethnicity ---###
 
 saveRDS(Etnia, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/Etnia.rds"))
 
-###--- Municipio ---###
+###--- Municipality ---###
 
 saveRDS(Municipio, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/Municipio.rds"))
 
-###--- Edad ---###
+###--- Age ---###
 
 saveRDS(Edad, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/Edad.rds"))
 
-###--- Departamento x etnia ---###
+###--- department x Ethnicity ---###
 
 saveRDS(departamento_etnia, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/Departamento_etnia.rds"))
 
 
-###--- Nal ---###
+###--- National ---###
 
 saveRDS(Nal, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/Nacional.rds"))
 
 
-###--- Clase ---###
+###--- Class ---###
 
 saveRDS(Clase, file = file.path(mount_point,"3. Modelos Plugin/Output/LD/Clase.rds"))
 
